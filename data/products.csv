@@ -1,0 +1,5 @@
+product_id;domain;category;brand_id;product_name;price;quality_tier;style_tags;is_repeatable;is_subscription;available_from;available_regions;compatible_os;offer_discount;description
+I0000;electronics;audio;B00;Audio 01;91.8;1;premium social;0;0;2025/10/01;north south east west central coastal;any;0.0;Synthetic audio offering
+I0001;electronics;audio;B01;Audio 02;120.03;2;social practical;0;0;2025/10/01;north south east west central coastal;any;0.3;Synthetic audio offering
+I0002;electronics;audio;B02;Audio 03;118.07;3;practical compact;0;0;2025/10/01;north south east west central coastal;any;0.0;Synthetic audio offering
+I0003;electronics;audio;B03;Audio 04;173.79;4;premium family;0;0;2025/10/01;north south east west central coastal;any;0.1;Synthetic audio offering

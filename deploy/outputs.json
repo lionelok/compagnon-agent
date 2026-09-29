@@ -1,0 +1,9 @@
+{
+  "instance_id": "i-04e241d02acce7102",
+  "security_group": "sg-07e1bc46ef82b308e",
+  "bucket": "lifestyle-companion-v2-905418279668",
+  "role": "lifestyle-companion-v2",
+  "origin": "ec2-3-238-58-219.compute-1.amazonaws.com",
+  "distribution_id": "E2JNS1KFGTO359",
+  "url": "https://d461szzyo7nmk.cloudfront.net"
+}

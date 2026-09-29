@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+
+# Runtime state (sessions, baskets, orders, loyalty, feedback) - created by the app
+state/
+simulation.sqlite
+*.sqlite-journal
+
+# Too large for GitHub (194 MB > 100 MB limit): interactions, recommender output, complements.
+# Get it from the deployment bundle - see SOLUTION.md "Data".
+data/full/insights.db

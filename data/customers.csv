@@ -1,0 +1,3 @@
+user_id;snapshot_date;region;age_band;household_size;membership_tier;device_type;device_os;tenure_months;monthly_budget;preferred_quality;language;marketing_opt_in;owned_items;declared_interests
+U000000;2026/04/01;west;35-49;5;basic;entry;ios;45;21.01;2.0;lang_c;1;I0912 I0916 I0922 I0942;
+U000001;2026/04/01;north;25-34;3;basic;entry;android;37;67.69;4.0;lang_c;0;;

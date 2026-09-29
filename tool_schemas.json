@@ -1,0 +1,102 @@
+[
+  {
+    "name": "get_basket",
+    "description": "Get the current customer basket and calculated total.",
+    "parameters": {
+      "type": "object",
+      "properties": {},
+      "required": [],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "add_to_basket",
+    "description": "Add an item only when the customer requests it; return the updated basket.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "product_id": {
+          "type": "string",
+          "description": "Exact product_id from the shared catalogue."
+        },
+        "quantity": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 99,
+          "description": "Units to add; non-repeatable products allow one."
+        }
+      },
+      "required": [
+        "product_id"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "update_basket",
+    "description": "Set quantity of an existing basket item; zero removes it.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "product_id": {
+          "type": "string",
+          "description": "Exact product_id from the shared catalogue."
+        },
+        "quantity": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 99,
+          "description": "New total quantity; zero removes the item."
+        }
+      },
+      "required": [
+        "product_id",
+        "quantity"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "remove_from_basket",
+    "description": "Remove an item requested by the customer.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "product_id": {
+          "type": "string",
+          "description": "Exact product_id from the shared catalogue."
+        }
+      },
+      "required": [
+        "product_id"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "prepare_checkout",
+    "description": "Prepare final summary; show it and ask for customer confirmation. Does not place an order.",
+    "parameters": {
+      "type": "object",
+      "properties": {},
+      "required": [],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "get_order",
+    "description": "Retrieve an existing simulated order belonging to the current customer.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "order_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "order_id"
+      ],
+      "additionalProperties": false
+    }
+  }
+]

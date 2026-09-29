@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Lifestyle Companion</title>
+  <meta name="theme-color" content="#d7141a">
+  <link rel="stylesheet" href="/static/styles.css?v=8">
+</head>
+<body>
+  <!-- Screen 1: demo customer identification (replaces login) -->
+  <main id="login" class="login">
+    <form id="login-form" class="login-card" autocomplete="off" novalidate>
+      <div class="logo" aria-hidden="true">
+        <svg viewBox="0 0 40 40"><circle cx="20" cy="20" r="20"/><path d="M12 21.5c0-5 4-8.5 8.7-8.5 1.6 0 3 .4 4.1 1-2 .2-3.7 1.9-3.7 3.9 0 .2 0 .4.1.6 3 .6 5 3 5 5.9 0 3.6-3 6.1-6.7 6.1-4.3 0-7.5-3.7-7.5-9z" fill="#fff"/></svg>
+      </div>
+      <h1>Lifestyle Companion</h1>
+      <p class="muted">Plan, discover and shop across Home, Shop and Rewards, by text or voice.</p>
+      <label for="user-id">Customer ID</label>
+      <input id="user-id" name="user_id" placeholder="e.g. U000001" required autofocus spellcheck="false" autocapitalize="characters" inputmode="text">
+      <p id="login-error" class="error" role="alert" aria-live="polite"></p>
+      <button type="submit" class="btn primary block" id="login-btn">Start</button>
+      <p class="hint">Demo only: the customer ID replaces sign-in. Try U000001, U000000 or U012345.</p>
+    </form>
+  </main>
+
+  <!-- Screen 2: the companion -->
+  <div id="app" class="app" hidden>
+    <header class="topbar">
+      <div class="brand">
+        <span class="logo small" aria-hidden="true"><svg viewBox="0 0 40 40"><circle cx="20" cy="20" r="20"/><path d="M12 21.5c0-5 4-8.5 8.7-8.5 1.6 0 3 .4 4.1 1-2 .2-3.7 1.9-3.7 3.9 0 .2 0 .4.1.6 3 .6 5 3 5 5.9 0 3.6-3 6.1-6.7 6.1-4.3 0-7.5-3.7-7.5-9z" fill="#fff"/></svg></span>
+        <span>Lifestyle Companion</span>
+      </div>
+      <nav class="tabs" role="tablist">
+        <button role="tab" data-view="chat" class="tab active" aria-selected="true">Chat</button>
+        <button role="tab" data-view="foryou" class="tab" aria-selected="false">For you</button>
+        <button role="tab" data-view="panel" class="tab mobile-only" aria-selected="false">Basket <span id="tab-count" class="count" hidden></span></button>
+      </nav>
+      <div class="who">
+        <span id="who-id" class="pill"></span>
+        <button id="new-chat" class="btn ghost small" title="Start a new conversation">New chat</button>
+        <button id="switch" class="btn ghost small" title="Switch customer">Switch</button>
+      </div>
+    </header>
+
+    <div class="layout">
+      <section id="view-chat" class="view chat-view active" aria-label="Conversation">
+        <div id="messages" class="messages" aria-live="polite"></div>
+        <div id="suggestions" class="suggestions"></div>
+        <form id="composer" class="composer" autocomplete="off">
+          <button type="button" id="mic" class="icon-btn" title="Speak" aria-label="Speak">
+            <svg viewBox="0 0 24 24"><path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v6a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.9V21h2v-2.1A7 7 0 0 0 19 12h-2z"/></svg>
+          </button>
+          <input id="input" placeholder="Ask anything: plan, find, compare, buy…" aria-label="Message">
+          <button type="button" id="speaker" class="icon-btn" title="Read replies aloud" aria-pressed="false" aria-label="Read replies aloud">
+            <svg viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9H4zm12.5 3a4.5 4.5 0 0 0-2.5-4v8a4.5 4.5 0 0 0 2.5-4z"/></svg>
+          </button>
+          <button type="submit" id="send" class="btn primary">Send</button>
+        </form>
+        <p id="voice-state" class="voice-state" aria-live="polite"></p>
+      </section>
+
+      <section id="view-foryou" class="view foryou-view" aria-label="For you"></section>
+
+      <aside id="view-panel" class="view panel" aria-label="Your account">
+        <div class="card">
+          <h2>Basket</h2>
+          <div id="basket"></div>
+          <div id="checkout"></div>
+        </div>
+        <div class="card jfu nudge" id="jfu">
+          <div class="jfu-head" id="jfu-head">
+            <div class="jfu-heading">
+              <h2>Just For U <span class="jfu-balance" id="jfu-balance" title="Your Bucks balance in US dollars">Balance: 100.00 USD</span></h2>
+              <span class="jfu-teaser" id="jfu-teaser">Your Bucks and picks are waiting</span>
+            </div>
+            <button type="button" id="jfu-toggle" class="jfu-toggle" aria-expanded="false" aria-controls="jfu-body" aria-label="Open Just For U" title="Open">+</button>
+          </div>
+          <div id="jfu-body" class="jfu-body" hidden>
+          <section class="bucks" aria-label="Bucks loyalty points">
+            <div class="bucks-head"><span class="bucks-label">Bucks</span><span class="bucks-rate">10 Bucks = $1</span></div>
+            <div class="bucks-balance"><strong id="bucks-points">1,000</strong> <span id="bucks-value" class="muted">= $100.00</span></div>
+            <p class="bucks-hint">Use them to pay at checkout.</p>
+          </section>
+          <section aria-labelledby="nl-title">
+            <h3 id="nl-title" class="jfu-title">Next Level</h3>
+            <ul id="next-level" class="mini-list"></ul>
+          </section>
+          <section aria-labelledby="fu-title">
+            <h3 id="fu-title" class="jfu-title">For U</h3>
+            <ul id="for-u" class="mini-list"></ul>
+          </section>
+          </div>
+        </div>
+        <div class="card">
+          <h2>What I remember</h2>
+          <p id="portrait" class="portrait" aria-live="polite"></p>
+          <div id="prefs" class="muted small-text">Nothing yet. Tell me your budget, style or goal.</div>
+        </div>
+        <div class="card">
+          <h2>Your profile</h2>
+          <div id="profile"></div>
+        </div>
+      </aside>
+    </div>
+  </div>
+  <dialog id="xnps" class="xnps" aria-labelledby="xnps-title">
+    <h2 id="xnps-title">How did we do?</h2>
+    <div id="xnps-body"></div>
+  </dialog>
+  <template id="product-tpl">
+    <article class="product">
+      <div class="p-top"><span class="p-num"></span><span class="p-cat"></span></div>
+      <h3 class="p-name"></h3>
+      <div class="p-price"><strong></strong> <s></s> <span class="badge"></span></div>
+      <div class="p-meta"></div>
+      <p class="p-why"></p>
+      <div class="p-actions"><button class="btn small primary add">Add</button><button class="btn small ghost more">Details</button></div>
+    </article>
+  </template>
+  <script src="/static/app.js?v=9"></script>
+</body>
+</html>
