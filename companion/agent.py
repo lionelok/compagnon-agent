@@ -21,6 +21,7 @@ from tool_adapter import call_tool
 from companion.contacts import ContactLog, new_contact, now_iso
 from companion.loyalty import Loyalty, LoyaltyError
 from companion.feedback import FeedbackStore
+from companion.offers import OfferLog
 
 ROOT = Path(__file__).resolve().parents[1]
 REGION = os.environ.get('AWS_REGION') or os.environ.get('AWS_DEFAULT_REGION') or 'us-east-1'
@@ -105,6 +106,11 @@ CUSTOM_TOOLS = [
      'input_schema': _schema({'points': {'type': 'integer', 'minimum': 0,
                                          'description': 'Bucks to use; omit to use as many as possible.'},
                               'remove': {'type': 'boolean', 'description': 'True to stop using Bucks on this checkout.'}})},
+    {'name': 'show_basket',
+     'description': "Display the customer's current basket (items, quantities, prices, total) as a card in the chat. "
+                    "Call it whenever you talk about what is in the basket, so the customer can see exactly what you "
+                    "refer to.",
+     'input_schema': _schema({})},
     {'name': 'show_options',
      'description': "Display product cards to the customer, numbered 1..n in the order given (the numbering the "
                     "customer will use, e.g. 'the second one'). Call it whenever you present products, with the "
@@ -123,7 +129,7 @@ STATUS = {'get_customer_overview': 'Looking at your profile and history', 'searc
           'show_options': 'Preparing options', 'get_basket': 'Checking your basket', 'add_to_basket': 'Adding to your basket',
           'update_basket': 'Updating your basket', 'remove_from_basket': 'Removing from your basket',
           'prepare_checkout': 'Preparing your checkout summary', 'get_order': 'Looking up your order',
-          'apply_bucks': 'Applying your Bucks'}
+          'apply_bucks': 'Applying your Bucks', 'show_basket': 'Showing your basket'}
 
 SYSTEM_TEMPLATE = """You are the Lifestyle Companion, the AI shopping and planning assistant inside a telco lifestyle app with three sections: Home, Shop and Rewards. Customers talk to you by text or voice. You help them plan for a need, discover relevant products, compare and choose, and complete a simulated purchase.
 
@@ -132,13 +138,13 @@ SYSTEM_TEMPLATE = """You are the Lifestyle Companion, the AI shopping and planni
 2. Recommend. Use get_recommendations (the recommender model's ranked output for this customer) together with search_products for the current request: the request and constraints decide what is relevant, the recommender and history rank within that. Present 2-4 options, each with one short reason drawn from its "why" field and facts (price, discount, quality tier, style). Always call show_options with the products in the order you describe them. For planning goals, propose a short plan (for example the 3-4 categories that matter most) and show the best options for the first step.
 3. Compare when asked: use get_product_details and give a compact comparison of the facts that differ.
 4. Adapt. When the customer changes budget or preferences, or rejects an option, call remember_preferences, then search again honouring the new constraints and excluding rejected products. Resolve references like "the first option" or "that one" with the numbered on-screen options in <app_context>. If nothing fits, say so and offer the closest alternatives (for example slightly above budget, or another category).
-5. Engage proactively and cross-sell. When the customer states a goal, keep your suggestions on that goal; bring up unrelated history (such as other cart items) only when there is no active goal. Start sessions with something genuinely useful from the customer's data (an item left in their cart that is now discounted, a favourite they have not bought, a recommender pick matching their interests). After an item is added to the basket, suggest one complementary product that fits the remaining budget (add_to_basket results include cross_sell_hint). Keep it to one suggestion at a time, never pushy. If the customer has marketing_opt_in = false, keep suggestions tied to what they are currently shopping for.
-6. Purchase. Add, update or remove basket items only when the customer asks or agrees. If adding an item would take the basket over the budget they gave you, say so and ask before adding it. If a request is ambiguous (for example "the cheapest of those" when nothing matched), ask which item they mean instead of guessing. When they want to check out, call prepare_checkout and summarise the items and total in one or two lines; the app shows the summary with a Confirm button. Ask them to press Confirm or say "confirm". Never say an order is placed unless <app_context> reports that the app created it. If the basket changes after a summary, the old summary is void: prepare a new one when they are ready.
+5. Engage proactively and cross-sell. When the customer states a goal, keep your suggestions on that goal; bring up unrelated history (such as other cart items) only when there is no active goal. Start sessions with something genuinely useful from the customer's data (an item they saved in their cart on a past visit that is now discounted, a favourite they have not bought, a recommender pick matching their interests). Always cross-sell after an add, like an experienced sales associate: every time add_to_basket succeeds, in that same reply confirm the add in one short sentence, then recommend 1-2 complementary products that complete the purchase. Take them from cross_sell_hint in the add_to_basket result (or call get_complementary_products), call show_options with them, and give each one concrete, factual reason it goes with what they just added: how the categories are used together, a matching style tag, a quality match, a discount, or that it fits the remaining budget. Base every reason only on catalogue facts and the customer's data; never invent features or benefits. One sentence per product, confident and friendly, never pushy; if the customer declines, drop it. If the customer has marketing_opt_in = false, keep suggestions tied to what they are currently shopping for.
+6. Purchase. The basket is exactly the "basket:" line in <app_context> (or the latest basket tool result), nothing else. Never say a product is in the basket unless it is listed there, and quote only the names, quantities and prices listed. Items under saved_in_cart_on_past_visits in the profile are from earlier visits and are NOT in the basket; call them "saved on a past visit". Whenever you talk about what is in the basket, call show_basket so the customer sees it. Add, update or remove basket items only when the customer asks or agrees. If adding an item would take the basket over the budget they gave you, say so and ask before adding it. If a request is ambiguous (for example "the cheapest of those" when nothing matched), ask which item they mean instead of guessing. When they want to check out, call prepare_checkout and summarise the items and total in one or two lines; the app shows the summary with a Confirm button. Ask them to press Confirm or say "confirm". Never say an order is placed unless <app_context> reports that the app created it. If the basket changes after a summary, the old summary is void: prepare a new one when they are ready.
 7. Bucks. Every customer has Bucks loyalty points (balance in <app_context>; 10 Bucks = $1). When you present a checkout summary, mention their balance and what it is worth and offer to apply it; call apply_bucks when they agree (all by default, or the amount they name). The checkout panel also has a "Use Bucks" switch. Bucks can't exceed the order total, and they are only spent when the order is created.
 
 # Facts and rules
 - Every product fact, price and availability must come from a tool result in this conversation. Never invent products, features, brands, specs or prices. Prices are in US dollars (USD): write them like $43.39; quote the discounted price and mention the discount when there is one. Never use other currencies or the word "units" for money.
-- Tools only return products this customer is eligible for. If the customer names a product that is not eligible, explain why in plain words (not launched yet, not sold in their region, incompatible with their device, already owned) and offer an alternative.
+- Search tools only return products this customer is eligible for. When the customer names a product (e.g. "add Kitchen 04"), act on it directly (add_to_basket, or get_product_details to check it); don't conclude from a search that it doesn't exist. If it isn't eligible, explain the actual reason in plain words (not launched yet, not sold in their region, incompatible with their device, already owned) and offer an alternative.
 - Non-repeatable products allow one unit. Subscription products (all of services: connectivity, delivery, learning, wellness, and entertainment streaming) can be recommended, but the simulation cannot check them out yet because billing terms are missing. Say so before adding one, and offer a one-off alternative when possible.
 - The catalogue does not sell handsets or phones themselves. For a new smartphone, say so in one sentence and in the same reply show the best options for their device from what the catalogue offers (mobile accessories and smart devices compatible with their OS, plus a connectivity plan if relevant), then ask what matters most to them.
 - Product names are generic ("Kitchen 34"). Refer to products by name, never by id, and don't claim details the catalogue doesn't hold (colour, size, specs). You can talk about what the catalogue does describe: category, style tags, quality tier (1 basic to 5 top), price and discount.
@@ -174,8 +180,9 @@ def _dump(blocks):
 
 
 class Companion:
-    def __init__(self, store, catalog, memory, contacts_path, loyalty_path, feedback_path):
+    def __init__(self, store, catalog, memory, contacts_path, loyalty_path, feedback_path, offers_path):
         self.store, self.catalog, self.memory = store, catalog, memory
+        self.offers = OfferLog(offers_path)
         self.loyalty = Loyalty(loyalty_path)
         self.feedback = FeedbackStore(feedback_path, store, catalog)
         self.client = AnthropicBedrock(aws_region=REGION, max_retries=3)
@@ -296,6 +303,10 @@ class Companion:
             return {'ok': True, 'data': {'displayed': [f"{o['n']}. {o['name']} {o['price']}" for o in state['shown']],
                                          'ineligible': [c['name'] for c in cards if not c.get('eligible')] or None}}
 
+        if name == 'show_basket':
+            basket = self.store.get_basket(user_id)
+            emit({'type': 'basket_card', 'basket': basket})
+            return {'ok': True, 'data': basket}
         if name == 'apply_bucks':
             if not state['checkout']:
                 return {'ok': False, 'error': {'code': 'NO_PENDING_CHECKOUT',
@@ -321,10 +332,18 @@ class Companion:
                 if budget is not None and prefs.get('budget_scope') == 'total':
                     budget = round(float(budget) - float(result['data']['total']), 2)
                     result['remaining_budget'] = budget
-                hint = cat.complements(user_id, [args['product_id']], budget, rejected | in_basket, 2)['results'] \
+                cap = self._cross_sell_cap(user_id, args['product_id'], budget)
+                hint = cat.complements(user_id, [args['product_id']], cap, rejected | in_basket, 2,
+                                       subscriptions=False)['results'] \
                     if budget is None or budget > 0 else []
-                result['cross_sell_hint'] = [{k: h[k] for k in ('product_id', 'name', 'price', 'category', 'why')}
+                result['cross_sell_hint'] = [{k: h[k] for k in ('product_id', 'name', 'price', 'category', 'styles',
+                                                                'quality_tier', 'discount_pct', 'why', 'pairs_with')}
                                              for h in hint]
+                self.offers.record(user_id, 'cross_sell', 'chat', hint)
+                if hint:
+                    result['next_step'] = ('Cross-sell now, in this same reply: confirm the add in one sentence, then '
+                                           'call show_options with these cross_sell_hint products and give each one a '
+                                           'factual reason it goes with the item just added.')
         elif result['ok'] and name == 'prepare_checkout':
             state['checkout'] = {'checkout_id': result['data']['checkout_id'], 'summary': result['data']['summary'],
                                  'bucks': None}
@@ -349,6 +368,7 @@ class Companion:
         plan = self.loyalty.plan(user_id, pending['summary']['total'], bucks.get('points', 0))  # re-checked now
         try:
             order = confirm_order(self.store, user_id, checkout_id=pending['checkout_id'], customer_confirmed=True)
+            self.offers.attribute(user_id, order)
             try:
                 used = self.loyalty.redeem(user_id, order['order_id'], plan['points'])
             except LoyaltyError:
@@ -371,6 +391,38 @@ class Companion:
         return (f"The customer explicitly confirmed the checkout summary and the app created simulated order "
                 f"{order['order_id']} ({items}; total ${order['total']}{paid}). Thank them, give the order reference, "
                 f"and optionally suggest one complementary product.")
+
+    def _cross_sell_cap(self, user_id, product_id, budget=None):
+        """Add-ons stay in proportion to the purchase, like a good sales associate's: at most 1.2x the price of
+        the item just added (never below $15), and within any budget the customer gave."""
+        price = float(self.catalog.final_price(self.catalog.products[product_id]))
+        cap = max(1.2 * price, 15.0)
+        return min(cap, float(budget)) if budget is not None else cap
+
+    def _auto_cross_sell(self, user_id, state, added, reply):
+        """Fallback when the model added an item without recommending anything to go with it."""
+        prefs = state['prefs']
+        basket = self.store.get_basket(user_id)
+        budget = prefs.get('budget')
+        if budget is not None and prefs.get('budget_scope') == 'total':
+            budget = float(budget) - float(basket['total'])
+            if budget <= 0:
+                return
+        exclude = set(prefs.get('rejected', [])) | {i['product_id'] for i in basket['items']}
+        cap = self._cross_sell_cap(user_id, added[-1], budget)
+        picks = self.catalog.complements(user_id, added[::-1], cap, exclude, 2, subscriptions=False)['results']
+        if not picks:
+            return
+        self.offers.record(user_id, 'cross_sell', 'chat', picks)
+        base = self.catalog.products[added[-1]]['product_name']
+        state['shown'] = [{'n': i + 1, 'product_id': c['product_id'], 'name': c['name'], 'price': c['price']}
+                          for i, c in enumerate(picks)]
+        state['events'].append('After the add, the app showed complementary options: '
+                               + '; '.join(f"{o['n']}. {o['name']} ${o['price']}" for o in state['shown']))
+        line = f"\n\nTo complete it, customers who choose {base} often add these:"
+        reply.append(line)
+        yield {'type': 'text', 'delta': line}
+        yield {'type': 'products', 'title': f'Goes well with {base}', 'items': picks}
 
     # ---------- Bucks ----------
     def checkout_view(self, user_id, checkout):
@@ -440,7 +492,7 @@ class Companion:
             def flush():
                 while out:
                     ev = out.pop(0)
-                    if ev['type'] in ('products', 'order', 'checkout'):
+                    if ev['type'] in ('products', 'order', 'checkout', 'basket_card'):
                         ui_items.append(ev)
                     yield ev
 
@@ -469,7 +521,8 @@ class Companion:
                 user_text = ('[The customer just opened the companion. Greet them briefly. If there is contact history, '
                              'first pick up the thread from their last contact (and address it first if it was negative '
                              'or unresolved). Then offer one or two helpful, personalised suggestions from their profile, '
-                             'activity and past contacts (for example an item left in their cart that is still available, '
+                             'activity and past contacts (for example an item they saved in their cart on a past visit and can '
+                             'still buy (say "saved on your last visit", never "in your basket"), '
                              'a favourite on discount, a top recommender pick that fits their budget, or the next step of '
                              'a plan they started). Show them with show_options. End with a short question about what '
                              'they want to plan or buy today.]')
@@ -486,6 +539,7 @@ class Companion:
             state['messages'].append({'role': 'user', 'content': '\n\n'.join(parts)})
 
             reply = []
+            added, cross_sold, basket_shown, changed = [], True, False, False
             try:
                 for step in range(MAX_STEPS):
                     with self.client.messages.stream(
@@ -510,6 +564,14 @@ class Companion:
                         yield {'type': 'status', 'text': STATUS.get(call.name, 'Working')}
                         try:
                             result = self._run_tool(user_id, state, call.name, call.input or {}, emit)
+                            if result['ok'] and call.name == 'add_to_basket':
+                                added.append(self.catalog.find_ids((call.input or {}).get('product_id')))
+                                cross_sold = False
+                            elif result['ok'] and call.name == 'show_options' and added:
+                                cross_sold = True
+                            elif result['ok'] and call.name == 'show_basket':
+                                basket_shown = True
+                            changed |= result['ok'] and call.name in MUTATING
                         except ToolError as e:
                             result = {'ok': False, 'error': {'code': e.code, 'message': e.message}}
                         except Exception as e:  # never leave a tool_use without its result
@@ -523,6 +585,18 @@ class Companion:
                         yield {'type': 'text', 'delta': '\n\n'}
                 else:
                     yield {'type': 'text', 'delta': "\n\nI've done several steps. What would you like next?"}
+                # Guarantees, whatever the model wrote: an add is always followed by a cross-sell, and any talk about
+                # the basket comes with the real basket on screen.
+                if added and not cross_sold:
+                    for ev in self._auto_cross_sell(user_id, state, [a for a in added if a], reply):
+                        if ev['type'] == 'products':
+                            ui_items.append(ev)
+                        yield ev
+                text_now = ''.join(reply)
+                basket = self.store.get_basket(user_id)
+                if not basket_shown and basket['items'] and (changed or re.search(r'\b(basket|cart)\b', text_now, re.I)):
+                    ui_items.append({'type': 'basket_card', 'basket': basket})
+                    yield {'type': 'basket_card', 'basket': basket}
             except APIError as e:
                 yield {'type': 'error', 'message': 'The assistant is temporarily unavailable. Please try again.'}
                 print('Bedrock error:', getattr(e, 'status_code', ''), str(e)[:500], flush=True)

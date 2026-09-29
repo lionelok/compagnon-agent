@@ -27,7 +27,7 @@ class CompanionTests(unittest.TestCase):
         self.store = Store(db_path=d / 'sim.sqlite', products_path=FULL / 'products.csv', customers_path=FULL / 'customers.csv')
         self.cat = Catalog(self.store, FULL / 'insights.db')
         self.mem = Memory(d / 'sessions.sqlite')
-        self.companion = Companion(self.store, self.cat, self.mem, d / 'contacts.jsonl', d / 'loyalty.sqlite', d / 'feedback.sqlite')
+        self.companion = Companion(self.store, self.cat, self.mem, d / 'contacts.jsonl', d / 'loyalty.sqlite', d / 'feedback.sqlite', d / 'offers.sqlite')
         self.u = 'U000001'
 
     def tearDown(self):
@@ -135,6 +135,57 @@ class CompanionTests(unittest.TestCase):
         self.assertEqual(r['nps'], 25.0)
         self.assertEqual(r['response_rate'], 80.0)
         self.assertIn('xNPS', fb.export_csv())
+
+    def test_add_always_carries_proportionate_cross_sell(self):
+        state = self.mem.load(self.u)
+        pid = self.cat.search(self.u, categories=['kitchen'], include_subscriptions=False, max_price=90)['results'][0]['product_id']
+        r = self.companion._run_tool(self.u, state, 'add_to_basket', {'product_id': pid}, lambda e: None)
+        cap = self.companion._cross_sell_cap(self.u, pid)
+        self.assertTrue(r['cross_sell_hint'])
+        for h in r['cross_sell_hint']:
+            self.assertLessEqual(float(h['price']), cap)
+            self.assertNotEqual(h['product_id'], pid)
+        events = list(self.companion._auto_cross_sell(self.u, state, [pid], []))
+        cards = next(e for e in events if e['type'] == 'products')
+        self.assertTrue(all(float(c['price']) <= cap and not c['subscription'] for c in cards['items']))
+        self.assertEqual([o['product_id'] for o in state['shown']], [c['product_id'] for c in cards['items']])
+
+    def test_dashboard_kpis(self):
+        from datetime import datetime, timedelta, timezone
+        from companion import dashboard
+        now = datetime.now(timezone.utc)
+        ts = lambda **kw: (now - timedelta(**kw)).isoformat(timespec='seconds')
+        log = self.companion.contacts
+        def contact(uid, start, dur, score, sentiment):
+            rec = {'contact_id': 'C' + uid + start, 'customer_id': uid, 'started_at': start, 'ended_at': start,
+                   'duration_seconds': dur, 'channel': 'text', 'turns': 3, 'reason': 'r', 'reason_category': 'other',
+                   'sentiment': sentiment, 'sentiment_score': score, 'sentiment_rationale': '', 'summary': '',
+                   'resolved': True, 'follow_up': None, 'xnps': None, 'outcome': {'orders': [], 'actions': []},
+                   'preferences': {}, 'analysis': 'model', 'verbatim': []}
+            log.append(rec)
+        contact('U000001', ts(hours=2), 120, 0.6, 'positive')     # single contact -> FCR
+        contact('U000000', ts(hours=3), 60, -0.2, 'neutral')      # two contacts -> repeat
+        contact('U000000', ts(hours=1), 180, 0.2, 'positive')
+        fb = self.companion.feedback
+        for score in (10, 9, 3):
+            fb.record_xnps(self.u, 'new_chat', None, 2, 0, score)
+        pid = self.cat.search(self.u, categories=['kitchen'], include_subscriptions=False)['results'][0]['product_id']
+        self.companion.offers.record(self.u, 'cross_sell', 'chat', [self.cat.card(pid)])
+        self.store.change(self.u, pid, 1, 'add')
+        order = self.store.confirm_order(self.u, self.store.prepare_checkout(self.u)['checkout_id'], True)
+        self.companion.offers.attribute(self.u, order)
+        d = dashboard.build('7d', self.store, log, fb, self.companion.offers, self.companion.loyalty)
+        self.assertEqual((d['fcr']['customers'], d['fcr']['unique_interactions'], d['fcr']['rate']), (2, 1, 50.0))
+        self.assertEqual(d['sessions']['avg_duration_s'], 120)
+        self.assertEqual(d['sentiment']['index'], round((0.2 + 1) * 50))
+        self.assertEqual(d['xnps']['nps'], round(100 * (2 - 1) / 3, 1))
+        self.assertEqual(d['sales']['orders'], 1)
+        self.assertEqual(d['sales']['value'], float(order['total']))
+        self.assertEqual(d['cross_sell']['converted'], 1)
+        self.assertEqual(d['cross_sell']['converted_value'], float(order['total']))
+        self.assertEqual(d['upsell']['offers'], 0)
+        tiers = {r['tier']: r['interactions'] for r in d['membership']}
+        self.assertEqual(sum(tiers.values()), 3)
 
     def test_customers_are_separated(self):
         a = self.mem.load('U000001'); a['prefs']['budget'] = 50; self.mem.save('U000001', a)

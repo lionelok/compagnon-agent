@@ -43,7 +43,7 @@ class Portraits:
             'membership_tier': p['membership_tier'],
             'member_for_months': p['tenure_months'],
             'recent_purchases': [x['name'] for x in a['recent_purchases'][:3]] + app_orders[:3],
-            'still_in_cart_or_favourites': len(a['left_in_cart']) + len(a['favourites_not_bought']),
+            'still_in_cart_or_favourites': len(a['saved_in_cart_on_past_visits']) + len(a['favourites_not_bought']),
             'current_goal': prefs.get('goal'),
             'liked_styles_this_session': prefs.get('liked_styles'),
             'categories_they_loved': sorted(set(loved)) or None,

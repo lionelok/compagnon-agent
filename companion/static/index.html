@@ -5,11 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Lifestyle Companion</title>
   <meta name="theme-color" content="#d7141a">
-  <link rel="stylesheet" href="/static/styles.css?v=8">
+  <link rel="stylesheet" href="/static/styles.css?v=10">
 </head>
 <body>
   <!-- Screen 1: demo customer identification (replaces login) -->
   <main id="login" class="login">
+    <a class="dash-link" href="/dashboard" title="Management dashboard">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 13h6V4H4v9zm0 7h6v-5H4v5zm8 0h8v-9h-8v9zm0-16v5h8V4h-8z"/></svg>Dashboard</a>
     <form id="login-form" class="login-card" autocomplete="off" novalidate>
       <div class="logo" aria-hidden="true">
         <svg viewBox="0 0 40 40"><circle cx="20" cy="20" r="20"/><path d="M12 21.5c0-5 4-8.5 8.7-8.5 1.6 0 3 .4 4.1 1-2 .2-3.7 1.9-3.7 3.9 0 .2 0 .4.1.6 3 .6 5 3 5 5.9 0 3.6-3 6.1-6.7 6.1-4.3 0-7.5-3.7-7.5-9z" fill="#fff"/></svg>
@@ -118,6 +120,6 @@
       <div class="p-actions"><button class="btn small primary add">Add</button><button class="btn small ghost more">Details</button></div>
     </article>
   </template>
-  <script src="/static/app.js?v=9"></script>
+  <script src="/static/app.js?v=10"></script>
 </body>
 </html>

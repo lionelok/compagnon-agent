@@ -175,7 +175,7 @@ class Catalog:
         if product_id in ins['recs']:
             bits.append(f"ranked #{ins['recs'][product_id][0]} for you by the recommender")
         if any(pid == product_id for _, pid, _ in ins['abandoned'][:20]):
-            bits.append('you left it in your cart')
+            bits.append('you saved it in your cart on a past visit')
         elif any(pid == product_id for _, pid, _ in ins['favourites'][:20]):
             bits.append('on your favourites list')
         if p['category'] in c.get('declared_interests', '').split():
@@ -232,7 +232,7 @@ class Catalog:
                 'recent_purchases': [{'name': name(pid), 'date': d, 'section': s, 'paid': money(_num(a))}
                                      for d, pid, s, a in recent],
                 'avg_monthly_spend': money(sum(spend.values()) / max(len(spend), 1)) if spend else '0.00',
-                'left_in_cart': still_buyable(ins['abandoned'], 4),
+                'saved_in_cart_on_past_visits': still_buyable(ins['abandoned'], 4),
                 'favourites_not_bought': still_buyable(ins['favourites'], 4),
                 'rewards_redeemed': [name(pid) for _, pid in ins['redeemed'][-4:]],
             },

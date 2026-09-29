@@ -1,0 +1,389 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Management Dashboard</title>
+<style>
+.viz-root {
+  color-scheme: light;
+  --page: #f9f9f7; --surface-1: #fcfcfb; --card: #ffffff;
+  --text-primary: #0b0b0b; --text-secondary: #52514e; --muted: #898781;
+  --grid: #e1e0d9; --baseline: #c3c2b7; --border: rgba(11,11,11,0.10);
+  --series-1: #2a78d6; --series-1-track: #cde2fb;
+  --good: #0ca30c; --warning: #fab219; --critical: #d03b3b; --neutral-mid: #f0efec;
+  --up: #006300; --down: #d03b3b; --brand: #d7141a;
+  --shadow: 0 1px 2px rgba(0,0,0,.04), 0 4px 14px rgba(0,0,0,.04);
+}
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme="light"])) .viz-root {
+    color-scheme: dark;
+    --page: #0d0d0d; --surface-1: #1a1a19; --card: #1a1a19;
+    --text-primary: #ffffff; --text-secondary: #c3c2b7; --muted: #898781;
+    --grid: #2c2c2a; --baseline: #383835; --border: rgba(255,255,255,0.10);
+    --series-1: #3987e5; --series-1-track: #0d366b;
+    --neutral-mid: #383835; --up: #0ca30c; --brand: #ff4b50; --shadow: none;
+  }
+}
+:root[data-theme="dark"] .viz-root {
+  color-scheme: dark;
+  --page: #0d0d0d; --surface-1: #1a1a19; --card: #1a1a19;
+  --text-primary: #ffffff; --text-secondary: #c3c2b7; --muted: #898781;
+  --grid: #2c2c2a; --baseline: #383835; --border: rgba(255,255,255,0.10);
+  --series-1: #3987e5; --series-1-track: #0d366b;
+  --neutral-mid: #383835; --up: #0ca30c; --brand: #ff4b50; --shadow: none;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--page); }
+.viz-root { min-height: 100vh; background: var(--page); color: var(--text-primary); font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; -webkit-font-smoothing: antialiased; }
+[hidden] { display: none !important; }
+
+/* header + filter row */
+.top { background: var(--card); border-bottom: 1px solid var(--border); }
+.top-inner { max-width: 1320px; margin: 0 auto; padding: 14px 24px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.brand { display: flex; align-items: center; gap: 10px; }
+.brand svg { width: 28px; height: 28px; fill: var(--brand); flex: none; }
+.brand h1 { font-size: 18px; margin: 0; font-weight: 700; }
+.brand p { margin: 0; font-size: 12px; color: var(--text-secondary); }
+.filters { margin-left: auto; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.seg { display: inline-flex; background: var(--page); border: 1px solid var(--border); border-radius: 10px; padding: 3px; }
+.seg button { border: 0; background: transparent; color: var(--text-secondary); font: inherit; font-weight: 600; font-size: 13px; padding: 6px 12px; border-radius: 7px; cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--card); color: var(--text-primary); box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+.btn { border: 1px solid var(--border); background: var(--card); color: var(--text-primary); font: inherit; font-weight: 600; font-size: 13px; padding: 7px 12px; border-radius: 9px; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
+.btn:hover { background: var(--page); }
+.updated { font-size: 12px; color: var(--muted); }
+
+main { max-width: 1320px; margin: 0 auto; padding: 20px 24px 40px; }
+.section-title { font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin: 22px 0 10px; }
+.section-title:first-child { margin-top: 0; }
+.grid { display: grid; gap: 14px; }
+.kpis { grid-template-columns: 1.35fr repeat(4, 1fr); }
+.row3 { grid-template-columns: repeat(3, 1fr); }
+.row2 { grid-template-columns: 1.3fr 1fr; }
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 16px 18px; box-shadow: var(--shadow); min-width: 0; transition: opacity .2s; }
+.loading .card { opacity: .55; }
+.card h2 { font-size: 13px; font-weight: 600; color: var(--text-secondary); margin: 0; display: flex; align-items: center; gap: 6px; }
+.def { font-size: 12px; color: var(--muted); margin: 2px 0 10px; }
+.value { font-size: 30px; font-weight: 700; line-height: 1.15; margin: 6px 0 2px; letter-spacing: -0.01em; }
+.hero .value { font-size: 48px; }
+.sub { font-size: 12.5px; color: var(--text-secondary); }
+.sub b { color: var(--text-primary); font-weight: 600; }
+.delta { font-size: 12px; font-weight: 700; margin-left: 6px; }
+.delta.up { color: var(--up); } .delta.down { color: var(--down); } .delta.flat { color: var(--muted); }
+.empty { color: var(--muted); font-size: 13px; padding: 10px 0; }
+
+/* meters & split bars */
+.meter { height: 8px; border-radius: 4px; background: var(--series-1-track); overflow: hidden; margin: 10px 0 4px; }
+.meter > span { display: block; height: 100%; background: var(--series-1); border-radius: 4px; }
+.split { display: flex; gap: 2px; height: 10px; margin: 10px 0 6px; }
+.split span { display: block; height: 100%; border-radius: 4px; min-width: 3px; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12px; color: var(--text-secondary); }
+.legend i { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+
+/* gauge */
+.gauge-wrap { display: flex; flex-direction: column; align-items: center; }
+.gauge { width: 100%; max-width: 280px; }
+.gauge-label { font-size: 16px; font-weight: 700; margin-top: -6px; }
+.gauge-ends { display: flex; justify-content: space-between; width: 100%; max-width: 280px; font-size: 11.5px; color: var(--muted); margin-top: 2px; }
+
+/* offers */
+.offer-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px 14px; margin-top: 4px; }
+.mini-stat .k { font-size: 12px; color: var(--muted); }
+.mini-stat .v { font-size: 20px; font-weight: 700; }
+
+/* column chart */
+.chart { position: relative; }
+.chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+.axis-text { font-size: 11px; fill: var(--muted); }
+.bar { fill: var(--series-1); }
+.bar-hit { fill: transparent; cursor: default; }
+.bar-hit:hover + .bar, .bar.hl { opacity: .8; }
+.tip { position: fixed; pointer-events: none; background: var(--card); color: var(--text-primary); border: 1px solid var(--border); border-radius: 8px; padding: 7px 10px; font-size: 12px; box-shadow: 0 6px 20px rgba(0,0,0,.15); z-index: 10; white-space: nowrap; }
+.tip b { font-weight: 700; }
+.toggle { margin-left: auto; font-size: 12px; font-weight: 600; color: var(--series-1); background: none; border: 0; cursor: pointer; padding: 0; font-family: inherit; }
+
+/* membership bars + tables */
+.hbars { display: grid; gap: 10px; margin: 6px 0 14px; }
+.hbar { display: grid; grid-template-columns: 70px 1fr 44px; align-items: center; gap: 10px; font-size: 13px; }
+.hbar .track { height: 12px; }
+.hbar .fill { height: 12px; background: var(--series-1); border-radius: 0 4px 4px 0; min-width: 2px; }
+.hbar .n { text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; }
+.hbar .name { text-transform: capitalize; color: var(--text-secondary); }
+table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+th { text-align: left; color: var(--muted); font-weight: 600; padding: 6px 8px; border-bottom: 1px solid var(--grid); }
+td { padding: 7px 8px; border-bottom: 1px solid var(--grid); font-variant-numeric: tabular-nums; }
+td:first-child { text-transform: capitalize; }
+th.r, td.r { text-align: right; }
+.table-scroll { overflow-x: auto; }
+.table-scroll table { min-width: 460px; }
+.note { font-size: 12px; color: var(--muted); margin-top: 18px; }
+
+@media (max-width: 1100px) { .kpis { grid-template-columns: repeat(2, 1fr); } .kpis .hero { grid-column: 1 / -1; } .row3 { grid-template-columns: 1fr 1fr; } .row3 .card:first-child { grid-column: 1 / -1; } .row2 { grid-template-columns: 1fr; } }
+@media (max-width: 640px) {
+  .top-inner, main { padding-left: 16px; padding-right: 16px; }
+  .kpis, .row3 { grid-template-columns: 1fr; }
+  .filters { margin-left: 0; width: 100%; }
+  .seg { width: 100%; overflow-x: auto; }
+  .hero .value { font-size: 40px; }
+}
+</style>
+</head>
+<body>
+<div class="viz-root">
+  <header class="top">
+    <div class="top-inner">
+      <div class="brand">
+        <svg viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="20"/><path d="M12 21.5c0-5 4-8.5 8.7-8.5 1.6 0 3 .4 4.1 1-2 .2-3.7 1.9-3.7 3.9 0 .2 0 .4.1.6 3 .6 5 3 5 5.9 0 3.6-3 6.1-6.7 6.1-4.3 0-7.5-3.7-7.5-9z" fill="#fff"/></svg>
+        <div><h1>Management dashboard</h1><p>Lifestyle Companion · customer experience &amp; commercial performance</p></div>
+      </div>
+      <div class="filters">
+        <div class="seg" role="group" aria-label="Period">
+          <button data-period="month" aria-pressed="true">This month</button>
+          <button data-period="7d" aria-pressed="false">Last 7 days</button>
+          <button data-period="30d" aria-pressed="false">Last 30 days</button>
+          <button data-period="all" aria-pressed="false">All time</button>
+        </div>
+        <button class="btn" id="refresh" title="Refresh now">↻ Refresh</button>
+        <a class="btn" href="/">← Companion</a>
+      </div>
+    </div>
+  </header>
+
+  <main id="main" class="loading">
+    <p class="updated" id="updated">Loading…</p>
+
+    <h3 class="section-title">Headline</h3>
+    <section class="grid kpis">
+      <article class="card hero">
+        <h2>Overall selling value</h2>
+        <p class="def" id="sales-period">Simulated orders placed through the companion</p>
+        <div class="value" id="sales-value">–</div>
+        <div class="sub" id="sales-sub"></div>
+      </article>
+      <article class="card">
+        <h2>FCR · first contact resolution</h2>
+        <p class="def">Customers with a single contact in the last 7 days</p>
+        <div class="value" id="fcr-value">–</div>
+        <div class="meter" aria-hidden="true"><span id="fcr-meter" style="width:0"></span></div>
+        <div class="sub" id="fcr-sub"></div>
+      </article>
+      <article class="card">
+        <h2>Session average</h2>
+        <p class="def">Mean duration of a chat session</p>
+        <div class="value" id="sess-value">–</div>
+        <div class="sub" id="sess-sub"></div>
+      </article>
+      <article class="card">
+        <h2>JNPS of the month</h2>
+        <p class="def">Journey NPS · rating of purchased products</p>
+        <div class="value" id="jnps-value">–</div>
+        <div id="jnps-split"></div>
+        <div class="sub" id="jnps-sub"></div>
+      </article>
+      <article class="card">
+        <h2>xNPS of the month</h2>
+        <p class="def">Experience NPS · rating of chat sessions</p>
+        <div class="value" id="xnps-value">–</div>
+        <div id="xnps-split"></div>
+        <div class="sub" id="xnps-sub"></div>
+      </article>
+    </section>
+
+    <h3 class="section-title">Experience &amp; revenue growth</h3>
+    <section class="grid row3">
+      <article class="card">
+        <h2>Chat sentiment</h2>
+        <p class="def">Average customer sentiment across analysed sessions</p>
+        <div class="gauge-wrap" id="gauge"></div>
+        <div class="legend" id="sent-split" style="justify-content:center;margin-top:10px"></div>
+      </article>
+      <article class="card">
+        <h2>Upselling</h2>
+        <p class="def">Next Level upgrades offered, and sales they led to (7-day attribution)</p>
+        <div id="upsell"></div>
+      </article>
+      <article class="card">
+        <h2>Cross-selling</h2>
+        <p class="def">Complementary products offered (chat &amp; For U), and sales they led to</p>
+        <div id="cross"></div>
+      </article>
+    </section>
+
+    <h3 class="section-title">Trends &amp; segments</h3>
+    <section class="grid row2">
+      <article class="card">
+        <h2>Selling value by day <button class="toggle" id="sales-toggle" aria-pressed="false">Table view</button></h2>
+        <p class="def">Order value per day, USD</p>
+        <div class="chart" id="sales-chart"></div>
+        <div id="sales-table" hidden></div>
+      </article>
+      <article class="card">
+        <h2>Interactions by membership</h2>
+        <p class="def">Chat sessions per membership tier in the period</p>
+        <div class="hbars" id="tier-bars"></div>
+        <div id="tier-table" class="table-scroll"></div>
+      </article>
+    </section>
+
+    <p class="note">NPS = % promoters (9–10) − % detractors (1–6) on a 1–10 scale; 7–8 are neutral. Sentiment index = (average sentiment score + 1) × 50, from 0 (bad) to 100 (good). Offers are counted once per customer, product and day; a sale counts as converted when the product was offered to that customer in the 7 days before the order. All figures come from the live simulation.</p>
+  </main>
+  <div class="tip" id="tip" hidden></div>
+</div>
+
+<script>
+'use strict';
+const $ = s => document.querySelector(s);
+const esc = t => String(t ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const usd = (v, d = 2) => v == null ? '–' : '$' + Number(v).toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d });
+const int = v => v == null ? '–' : Number(v).toLocaleString('en-US');
+const pct = v => v == null ? '–' : `${Number(v).toLocaleString('en-US', { maximumFractionDigits: 1 })}%`;
+const signed = v => v == null ? '–' : (v > 0 ? '+' : '') + Number(v).toLocaleString('en-US', { maximumFractionDigits: 1 });
+const dur = s => s == null ? '–' : `${Math.floor(s / 60)}m ${String(Math.round(s % 60)).padStart(2, '0')}s`;
+let period = 'month', lastData = null;
+
+function tip(e, html) { const t = $('#tip'); t.innerHTML = html; t.hidden = false; const x = Math.min(e.clientX + 14, innerWidth - t.offsetWidth - 8); t.style.left = x + 'px'; t.style.top = (e.clientY - t.offsetHeight - 10) + 'px'; }
+function untip() { $('#tip').hidden = true; }
+
+function npsCard(key, d) {
+  const cur = d.nps;
+  $(`#${key}-value`).innerHTML = cur == null ? '<span class="empty">No responses yet</span>'
+    : `${signed(cur)}${deltaHtml(cur, d.previous_month.nps, 'pts vs ' + d.previous_month.month.split(' ')[0])}`;
+  const total = d.promoters + d.neutrals + d.detractors;
+  $(`#${key}-split`).innerHTML = total ? `<div class="split" role="img" aria-label="${d.promoters} promoters, ${d.neutrals} neutral, ${d.detractors} detractors">
+      ${d.promoters ? `<span style="flex:${d.promoters};background:var(--good)"></span>` : ''}
+      ${d.neutrals ? `<span style="flex:${d.neutrals};background:var(--warning)"></span>` : ''}
+      ${d.detractors ? `<span style="flex:${d.detractors};background:var(--critical)"></span>` : ''}</div>
+    <div class="legend"><span><i style="background:var(--good)"></i>Promoters ${d.promoters}</span><span><i style="background:var(--warning)"></i>Neutral ${d.neutrals}</span><span><i style="background:var(--critical)"></i>Detractors ${d.detractors}</span></div>` : '';
+  $(`#${key}-sub`).innerHTML = `<b>${int(d.responses)}</b> responses${d.response_rate != null ? ` · ${pct(d.response_rate)} response rate` : ''}${d.avg_score != null ? ` · avg ${d.avg_score}/10` : ''} · ${esc(d.month)}`;
+}
+function deltaHtml(cur, prev, label) {
+  if (cur == null || prev == null) return '';
+  const diff = cur - prev, cls = diff > 0 ? 'up' : diff < 0 ? 'down' : 'flat', arrow = diff > 0 ? '▲' : diff < 0 ? '▼' : '■';
+  return `<span class="delta ${cls}" title="${esc(label)}">${arrow} ${signed(Math.abs(diff))} ${esc(label)}</span>`;
+}
+
+function gauge(s) {
+  const box = $('#gauge');
+  if (s.index == null) { box.innerHTML = '<p class="empty">No analysed sessions in this period</p>'; $('#sent-split').innerHTML = ''; return; }
+  // Semicircle 0..100: bad (0-40) critical, fair (40-60) warning, good (60-100) good; 2px gaps between bands.
+  const cx = 140, cy = 130, r = 104, w = 18;
+  const pt = (v, rr) => { const a = Math.PI * (1 - v / 100); return [cx + rr * Math.cos(a), cy - rr * Math.sin(a)]; };
+  const arc = (a, b, color) => { const [x1, y1] = pt(a, r), [x2, y2] = pt(b, r); return `<path d="M${x1} ${y1} A${r} ${r} 0 0 1 ${x2} ${y2}" stroke="${color}" stroke-width="${w}" fill="none" stroke-linecap="butt"/>`; };
+  const v = Math.max(0, Math.min(100, s.index));
+  const [nx, ny] = pt(v, r - 30);
+  const label = v < 40 ? 'Bad' : v < 60 ? 'Fair' : 'Good';
+  box.innerHTML = `<svg class="gauge" viewBox="0 0 280 150" role="img" aria-label="Sentiment index ${v} out of 100, ${label}">
+      ${arc(0, 39.4, 'var(--critical)')}${arc(40.6, 59.4, 'var(--warning)')}${arc(60.6, 100, 'var(--good)')}
+      <line x1="${cx}" y1="${cy}" x2="${nx}" y2="${ny}" stroke="var(--text-primary)" stroke-width="3" stroke-linecap="round"/>
+      <circle cx="${cx}" cy="${cy}" r="7" fill="var(--text-primary)"/><circle cx="${cx}" cy="${cy}" r="3" fill="var(--card)"/>
+      <text x="${cx}" y="${cy - 34}" text-anchor="middle" style="font-size:30px;font-weight:700;fill:var(--text-primary)">${v}</text>
+    </svg>
+    <div class="gauge-label">${label} <span class="sub">· ${s.analysed} sessions · avg score ${signed(s.avg_score)}</span></div>
+    <div class="gauge-ends"><span>Bad</span><span>Good</span></div>`;
+  const sp = s.split;
+  $('#sent-split').innerHTML = `<span><i style="background:var(--good)"></i>Positive ${sp.positive}</span><span><i style="background:var(--baseline)"></i>Neutral ${sp.neutral}</span><span><i style="background:var(--warning)"></i>Mixed ${sp.mixed}</span><span><i style="background:var(--critical)"></i>Negative ${sp.negative}</span>`;
+}
+
+function offerCard(el, o) {
+  if (!o.offers) { el.innerHTML = '<p class="empty">No offers made in this period</p>'; return; }
+  el.innerHTML = `<div class="value">${usd(o.converted_value)}</div><div class="sub">converted sales value</div>
+    <div class="meter" aria-hidden="true"><span style="width:${Math.min(100, o.conversion_rate || 0)}%"></span></div>
+    <div class="sub"><b>${pct(o.conversion_rate)}</b> conversion rate</div>
+    <div class="offer-grid" style="margin-top:12px">
+      <div class="mini-stat"><div class="k">Offers made</div><div class="v">${int(o.offers)}</div></div>
+      <div class="mini-stat"><div class="k">Customers reached</div><div class="v">${int(o.customers_reached)}</div></div>
+      <div class="mini-stat"><div class="k">Offers converted</div><div class="v">${int(o.converted)}</div></div>
+      <div class="mini-stat"><div class="k">Value offered</div><div class="v">${usd(o.offered_value, 0)}</div></div>
+    </div>`;
+}
+
+function salesChart(days) {
+  const box = $('#sales-chart');
+  if (!days.length || !days.some(d => d.orders)) { box.innerHTML = '<p class="empty">No orders in this period</p>'; $('#sales-table').innerHTML = ''; return; }
+  const W = 640, H = 220, L = 52, R = 8, T = 10, B = 26, pw = W - L - R, ph = H - T - B;
+  const max = Math.max(...days.map(d => d.value), 1);
+  const step = niceStep(max / 4), top = Math.ceil(max / step) * step;
+  const bw = pw / days.length, gap = Math.max(2, bw - 36, bw * 0.3);  // thin bars, max 36px wide
+  let grid = '';
+  for (let v = 0; v <= top + 1e-9; v += step) {
+    const y = T + ph - (v / top) * ph;
+    grid += `<line x1="${L}" x2="${W - R}" y1="${y}" y2="${y}" stroke="${v === 0 ? 'var(--baseline)' : 'var(--grid)'}" stroke-width="1"/><text class="axis-text" x="${L - 8}" y="${y + 4}" text-anchor="end">${usd(v, 0)}</text>`;
+  }
+  const every = Math.ceil(days.length / 8);
+  const bars = days.map((d, i) => {
+    const h = (d.value / top) * ph, x = L + i * bw + gap / 2, y = T + ph - h, w = Math.max(2, bw - gap);
+    const r = Math.min(4, w / 2, h);
+    const path = h > 0 ? `M${x} ${T + ph} V${y + r} Q${x} ${y} ${x + r} ${y} H${x + w - r} Q${x + w} ${y} ${x + w} ${y + r} V${T + ph} Z` : '';
+    const lbl = i % every === 0 ? `<text class="axis-text" x="${x + w / 2}" y="${H - 8}" text-anchor="middle">${fmtDay(d.date)}</text>` : '';
+    return `<g><rect class="bar-hit" x="${L + i * bw}" y="${T}" width="${bw}" height="${ph}" data-i="${i}"/>${path ? `<path class="bar" d="${path}" data-i="${i}"/>` : ''}${lbl}</g>`;
+  }).join('');
+  box.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Selling value by day">${grid}${bars}</svg>`;
+  box.querySelectorAll('.bar-hit').forEach(el => {
+    const d = days[el.dataset.i];
+    el.addEventListener('mousemove', e => tip(e, `<b>${fmtDay(d.date, true)}</b><br>${usd(d.value)} · ${d.orders} order${d.orders === 1 ? '' : 's'}`));
+    el.addEventListener('mouseleave', untip);
+  });
+  $('#sales-table').innerHTML = `<table><thead><tr><th>Date</th><th class="r">Orders</th><th class="r">Value</th></tr></thead><tbody>${
+    days.filter(d => d.orders).map(d => `<tr><td>${fmtDay(d.date, true)}</td><td class="r">${d.orders}</td><td class="r">${usd(d.value)}</td></tr>`).join('')}</tbody></table>`;
+}
+function niceStep(raw) { const p = Math.pow(10, Math.floor(Math.log10(raw || 1))); for (const m of [1, 2, 2.5, 5, 10]) if (m * p >= raw) return m * p; return 10 * p; }
+function fmtDay(iso, long) { const d = new Date(iso + 'T00:00:00Z'); return d.toLocaleDateString('en-US', long ? { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' } : { month: 'short', day: 'numeric', timeZone: 'UTC' }); }
+
+function membership(rows) {
+  const max = Math.max(...rows.map(r => r.interactions), 1);
+  $('#tier-bars').innerHTML = rows.map(r => `<div class="hbar"><span class="name">${esc(r.tier)}</span><div class="track"><div class="fill" style="width:${(r.interactions / max) * 100}%"></div></div><span class="n">${int(r.interactions)}</span></div>`).join('');
+  $('#tier-table').innerHTML = `<table><thead><tr><th>Tier</th><th class="r">Sessions</th><th class="r">Customers</th><th class="r">Avg session</th><th class="r">Sentiment</th><th class="r">Sales</th></tr></thead><tbody>${
+    rows.map(r => `<tr><td>${esc(r.tier)}</td><td class="r">${int(r.interactions)}</td><td class="r">${int(r.customers)}</td><td class="r">${dur(r.avg_duration_s)}</td><td class="r">${r.sentiment_index == null ? '–' : r.sentiment_index + '/100'}</td><td class="r">${usd(r.sales_value)}</td></tr>`).join('')}</tbody></table>`;
+}
+
+function render(d) {
+  lastData = d;
+  $('#updated').textContent = `${d.period.label} · updated ${new Date(d.generated_at).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })}`;
+  const s = d.sales;
+  $('#sales-period').textContent = `Simulated orders placed through the companion · ${d.period.label}`;
+  $('#sales-value').textContent = usd(s.value);
+  $('#sales-sub').innerHTML = `<b>${int(s.orders)}</b> orders · <b>${int(s.items)}</b> items · AOV <b>${usd(s.aov)}</b><br>Paid ${usd(s.paid_value)} · Bucks redeemed ${usd(s.bucks_redeemed_value)}`;
+
+  const f = d.fcr;
+  $('#fcr-value').textContent = pct(f.rate);
+  $('#fcr-meter').style.width = (f.rate || 0) + '%';
+  $('#fcr-sub').innerHTML = f.customers ? `<b>${int(f.unique_interactions)}</b> of ${int(f.customers)} customers contacted once · ${int(f.repeat_customers)} came back · ${int(f.contacts)} contacts` : 'No contacts in the last 7 days';
+
+  const se = d.sessions;
+  $('#sess-value').textContent = dur(se.avg_duration_s);
+  $('#sess-sub').innerHTML = se.count ? `<b>${se.avg_messages}</b> customer messages per session · <b>${int(se.count)}</b> sessions · ${int(se.customers)} customers · voice ${pct(se.voice_share)}` : 'No sessions in this period';
+
+  npsCard('jnps', d.jnps); npsCard('xnps', d.xnps);
+  gauge(d.sentiment);
+  offerCard($('#upsell'), d.upsell); offerCard($('#cross'), d.cross_sell);
+  salesChart(s.by_day);
+  membership(d.membership);
+}
+
+async function load() {
+  $('#main').classList.add('loading');
+  try {
+    const r = await fetch(`/api/dashboard?period=${period}`);
+    if (!r.ok) throw new Error('Could not load the dashboard.');
+    render(await r.json());
+  } catch (e) { $('#updated').textContent = e.message; }
+  finally { $('#main').classList.remove('loading'); }
+}
+
+document.querySelectorAll('.seg button').forEach(b => b.addEventListener('click', () => {
+  period = b.dataset.period;
+  document.querySelectorAll('.seg button').forEach(x => x.setAttribute('aria-pressed', x === b));
+  load();
+}));
+$('#refresh').addEventListener('click', load);
+$('#sales-toggle').addEventListener('click', e => {
+  const on = e.target.getAttribute('aria-pressed') !== 'true';
+  e.target.setAttribute('aria-pressed', on); e.target.textContent = on ? 'Chart view' : 'Table view';
+  $('#sales-chart').hidden = on; $('#sales-table').hidden = !on;
+});
+load();
+setInterval(load, 60000);
+</script>
+</body>
+</html>

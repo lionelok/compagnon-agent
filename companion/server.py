@@ -22,6 +22,7 @@ from companion.catalog import Catalog
 from companion.memory import Memory
 from companion.feedback import XNPS_QUESTION
 from companion.portrait import Portraits
+from companion import dashboard as dashboards
 from companion.agent import SUMMARY_MODEL_ID
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -34,7 +35,7 @@ store = Store(db_path=STATE / 'simulation.sqlite', products_path=DATA / 'product
 catalog = Catalog(store, DATA / 'insights.db')
 memory = Memory(STATE / 'sessions.sqlite')
 companion = Companion(store, catalog, memory, STATE / 'contact_history.jsonl', STATE / 'loyalty.sqlite',
-                      STATE / 'feedback.sqlite')
+                      STATE / 'feedback.sqlite', STATE / 'offers.sqlite')
 feedback = companion.feedback
 portraits = Portraits(companion.client, SUMMARY_MODEL_ID, catalog, feedback, companion.loyalty)
 IDLE_SECONDS = int(os.environ.get('CONTACT_IDLE_SECONDS', 600))  # a session ends after 10 minutes without activity
@@ -77,6 +78,19 @@ class TtsIn(BaseModel):
 @app.get('/')
 def index():
     return FileResponse(STATIC / 'index.html', headers={'Cache-Control': 'no-store'})
+
+
+@app.get('/dashboard')
+def dashboard_page():
+    return FileResponse(STATIC / 'dashboard.html', headers={'Cache-Control': 'no-store'})
+
+
+@app.get('/api/dashboard')
+def dashboard_data(period: str = 'month'):
+    """Management KPIs: FCR, sessions, JNPS/xNPS of the month, sentiment, sales, upsell/cross-sell, membership."""
+    if period not in ('month', '7d', '30d', 'all'):
+        raise HTTPException(400, 'period must be month, 7d, 30d or all')
+    return dashboards.build(period, store, companion.contacts, feedback, companion.offers, companion.loyalty)
 
 
 @app.get('/health')
@@ -185,7 +199,7 @@ def for_you(user_id: str):
     rails = []
     picks = catalog.recommendations(uid, exclude_ids=rejected, limit=8)['results']
     rails.append({'title': 'Picked for you', 'section': 'Home', 'items': picks})
-    carted = [catalog.card(p, reason='Left in your cart') for _, p, _ in ins['abandoned']
+    carted = [catalog.card(p, reason='Saved on a past visit') for _, p, _ in ins['abandoned']
               if not catalog.eligibility(uid, p) and p not in rejected]
     fav = [catalog.card(p, reason='From your favourites') for _, p, _ in ins['favourites']
            if not catalog.eligibility(uid, p) and p not in rejected]
@@ -232,6 +246,8 @@ def just_for_u(user_id: str):
             found = catalog.complements(uid, base, cap, taken, 3 - len(cross), subscriptions=False)['results']
             cross += found
             taken |= {c['product_id'] for c in found}
+    companion.offers.record(uid, 'upsell', 'just_for_u', upsell)
+    companion.offers.record(uid, 'cross_sell', 'just_for_u', cross)
     return {'bucks': companion.loyalty.summary(uid),
             'next_level': [_mini(c, c['why']) for c in upsell],
             'for_u': [_mini(c, f"Goes with {c['pairs_with']}") for c in cross],

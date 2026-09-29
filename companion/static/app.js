@@ -208,6 +208,7 @@ function addBotFromHistory(m) {
 function renderItem(el, ev, historic) {
   const box = el.querySelector('.extras');
   if (ev.type === 'products') box.append(cardsBlock(ev.title, ev.items, true));
+  if (ev.type === 'basket_card') box.append(basketCard(ev.basket));
   if (ev.type === 'order') box.append(orderBox(ev.order));
   if (ev.type === 'checkout' && historic) {
     const d = document.createElement('div'); d.className = 'muted small-text'; d.textContent = `Checkout summary prepared: total ${usd(ev.checkout.summary.total)}`; box.append(d);
@@ -238,7 +239,7 @@ async function send(text, { channel = 'text', action = null, surveyId = null } =
         switch (ev.type) {
           case 'text': reply += ev.delta; bubble.hidden = false; bubble.innerHTML = md(reply); break;
           case 'status': status.innerHTML = `<span class="dots">${esc(ev.text)}</span>`; break;
-          case 'products': renderItem(el, ev); break;
+          case 'products': case 'basket_card': renderItem(el, ev); break;
           case 'basket': renderBasket(ev.basket); break;
           case 'checkout': renderCheckout(ev.checkout); break;
           case 'checkout_cleared': renderCheckout(null); break;
@@ -359,6 +360,13 @@ function renderCheckout(c) {
   });
   $('#confirm-btn').addEventListener('click', () => { showView('chat'); send('Confirm order', { action: 'confirm' }); });
   $('#cancel-btn').addEventListener('click', () => { showView('chat'); send('Cancel the checkout for now', { action: 'cancel_checkout' }); });
+}
+// The real basket, shown in the chat whenever the companion talks about it.
+function basketCard(b) {
+  const d = document.createElement('div'); d.className = 'basket-card';
+  d.innerHTML = `<p class="cards-title">🛒 Your basket</p>${b.items.map(i => `<div class="line"><span class="name">${esc(i.product_name)} <span class="qty">× ${i.quantity}</span></span><span>${esc(usd(i.line_total))}</span></div>`).join('')}
+    <div class="total"><span>Total</span><span>${esc(usd(b.total))}</span></div>`;
+  return d;
 }
 function orderBox(o) {
   const d = document.createElement('div'); d.className = 'order-box';

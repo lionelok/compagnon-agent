@@ -86,6 +86,33 @@ flowchart LR
 | Memory and context | Memory is per customer and persisted, so switching customers loads that customer's own conversation and basket. Transcripts are append-only; long conversations roll into a new segment with a Haiku summary plus the structured memory. |
 | Accuracy | Tools return only products the customer can buy (launch date, region, device OS, already owned), with prices computed like the basket's. Ineligible counts come back as `hidden_counts`. Subscriptions are flagged because the starter disables their checkout. Errors are reported, never shown as success. |
 
+## Management dashboard
+
+A **Dashboard** button on the login screen opens `/dashboard`, a one-page view for corporate management. One period filter row (This month, Last 7 days, Last 30 days, All time) scopes the page, except FCR, which is always the last 7 days, and the two NPS tiles, which are always the current month. The page refreshes every minute. Data comes from `GET /api/dashboard?period=` (`companion/dashboard.py`).
+
+| KPI | Definition |
+|---|---|
+| **Overall selling value** (headline figure) | Value of simulated orders, with order count, items, average order value (AOV), amount paid and Bucks redeemed |
+| **FCR**, first contact resolution | Share of customers who had **exactly one** interaction in the last 7 days (unique interactions ÷ customers who made contact); also shows repeat customers |
+| **Session average** | Mean session duration, customer messages per session, sessions, customers and share of sessions using voice |
+| **JNPS of the month** | Journey NPS for the calendar month, with the promoter/neutral/detractor split, responses, response rate and change vs last month |
+| **xNPS of the month** | Experience NPS for chat sessions, same layout |
+| **Chat sentiment** | Gauge from Bad (0) through Fair to Good (100): index = (average contact sentiment score + 1) × 50, plus the split of sentiment labels |
+| **Upselling** | Next Level offers made, customers reached, offers converted, conversion rate and converted sales value |
+| **Cross-selling** | The same measures for cross-sell offers in the chat and the For U panel |
+| **Selling value by day** | Column chart for each day of the period, with hover details and a table view |
+| **Interactions by membership** | Sessions per tier (basic, plus, premium), with customers, average session, sentiment and sales per tier |
+
+**How offers are counted:** each offer is counted once per customer, product and day (`companion/offers.py`, `state/offers.sqlite`). A sale counts as converted when that product was offered to that customer in the 7 days before the order. Offer tracking started when the dashboard shipped, so earlier orders are not attributed to any offer.
+
+## Cross-selling after every add, and a grounded basket
+
+- **Every add is followed by a cross-sell.** `add_to_basket` results carry 1–2 complementary products (`cross_sell_hint`) and a `next_step` telling the companion to recommend them in the same reply, like an experienced sales associate. It shows them as cards, each with a factual reason it goes with the item: category use, matching style, quality, discount, or fit with the remaining budget. If the model still skips it, the app adds a "Goes well with …" card itself, so the rule holds in every case.
+- **Add-ons stay proportionate.** Suggestions cost at most 1.2× the item just added (minimum $15) and stay within any budget the customer gave. They exclude subscriptions, items already in the basket, rejected items and items already owned.
+- **The basket is only what the app says it is.** The companion may only name items listed in the live basket. Items from past visits are labelled `saved_in_cart_on_past_visits` and described as "saved on a past visit", never as "in your basket".
+- **The basket is always visible when discussed.** The `show_basket` tool puts a 🛒 basket card (items, quantities, prices, total) in the chat. The app also adds one automatically after any basket change, or whenever the reply mentions the basket or cart.
+- **Named products are checked, not guessed.** When the customer asks for a product by name, the companion checks that product directly. If it can't be bought, the companion gives the real reason (region, launch date, device, already owned) instead of saying it doesn't exist.
+
 ## Just For U (side panel)
 
 | Group | What it shows | Logic |
@@ -215,6 +242,7 @@ unprivileged user; port 80 accepts traffic from CloudFront's origin-facing IP ra
 | `companion/catalog.py` | Customer insights, eligibility-safe search, recommendations, complements, reasons |
 | `companion/memory.py` | Per-customer persisted session memory |
 | `companion/portrait.py` | Warm customer portrait for the What I remember panel |
+| `companion/dashboard.py`, `companion/offers.py`, `companion/static/dashboard.html` | Management dashboard KPIs, offer tracking and the dashboard page |
 | `companion/feedback.py` | JNPS and xNPS surveys: selection, answers, personalisation context, report and CSV |
 | `companion/loyalty.py` | Bucks loyalty ledger (balance, checkout plan, redeem-once per order) |
 | `companion/contacts.py` | Contact history: record building, Haiku analysis (reason, sentiment, summary), JSONL and CSV |
